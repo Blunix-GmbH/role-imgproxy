@@ -1,0 +1,9 @@
+- name: reload systemd daemon
+  systemd:
+    daemon_reload: True
+
+- name: restart imgproxy
+  systemd:
+    name: imgproxy
+    state: restarted
+    enabled: True

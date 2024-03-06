@@ -1,0 +1,27 @@
+[Unit]
+Description=imgproxy
+Documentation=https://docs.imgproxy.net/
+Wants=network-online.target
+After=network-online.target
+AssertFileIsExecutable=/opt/imgproxy/imgproxy
+
+[Service]
+WorkingDirectory=/opt/imgproxy
+User=imgproxy
+Group=imgproxy
+PermissionsStartOnly=true
+EnvironmentFile=-/opt/imgproxy/imgproxy.conf
+ExecStart=/opt/imgproxy/imgproxy
+StandardOutput=journal
+StandardError=inherit
+# Specifies the maximum file descriptor number that can be opened by this process
+LimitNOFILE=65536
+# Disable timeout logic and wait until process is stopped
+TimeoutStopSec=0
+# SIGTERM signal is used to stop Imgproxy
+KillSignal=SIGTERM
+SendSIGKILL=no
+SuccessExitStatus=0
+
+[Install]
+WantedBy=multi-user.target

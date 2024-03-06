@@ -1,0 +1,122 @@
+- name: install apt requirements
+  apt:
+    name:
+      - bc
+      - build-essential
+      - git
+      - libcfitsio-dev
+      - libexif-dev
+      - libexpat1-dev
+      - libfftw3-dev
+      - libglib2.0-dev
+      - libgsf-1-dev
+      - libimagequant-dev
+      - liblcms2-dev
+      - libmatio-dev
+      - libopenexr-dev
+      - libopenjp2-7-dev
+      - libopenslide-dev
+      - liborc-dev
+      - libpango1.0-dev
+      - libpoppler-glib-dev
+      - librsvg2-dev
+      - libtiff5-dev
+      - libwebp-dev
+      - ninja-build
+      - python3-pip
+      - wget
+
+
+- name: create group imgproxy
+  group:
+    name: imgproxy
+    gid: 1930
+    system: True
+
+- name: create user imgproxy
+  user:
+    name: imgproxy
+    uid: 1930
+    system: True
+    state: present
+    home: /opt/imgproxy/
+    shell: /bin/bash
+    groups: imgproxy
+
+
+
+# Install vips following https://github.com/libvips/libvips/wiki/Build-for-Ubuntuo
+
+- name: install meson via pip3
+  pip:
+    name: meson
+    executable: /usr/bin/pip3
+
+- name: create directory /usr/local/src/vips/
+  file:
+    state: directory
+    path: /usr/local/src/vips/
+    owner: root
+    group: root
+    mode: 0700
+
+- name: "download and extract vips {{ imgproxy_vips_version }} archive"
+  unarchive:
+    src: "https://github.com/libvips/libvips/releases/download/v{{ imgproxy_vips_version }}/vips-{{ imgproxy_vips_version }}.tar.xz"
+    dest: /usr/local/src/vips/
+    remote_src: True
+    owner: root
+    group: root
+    mode: 0700
+
+- name: "meson setup build --libdir=lib --buildtype=release -Dintrospection=disabled"
+  shell: "meson setup build --libdir=lib --buildtype=release -Dintrospection=disabled"
+  args:
+    executable: /bin/bash
+    chdir: "/usr/local/src/vips/vips-{{ imgproxy_vips_version }}/"
+
+- name: "meson compile && meson test && meson install"
+  shell: "meson compile && meson test && meson install"
+  args:
+    executable: /bin/bash
+    chdir: "/usr/local/src/vips/vips-{{ imgproxy_vips_version }}/build/"
+
+- name: symlink /usr/local/lib/libvips.so.42 to /usr/lib/libvips.so.42
+  file:
+    state: link
+    src: /usr/local/lib/libvips.so.42
+    dest: /usr/lib/libvips.so.42
+
+
+
+# https://docs.imgproxy.net/installation
+
+- name: git clone https://github.com/imgproxy/imgproxy.git
+  git:
+    repo: https://github.com/imgproxy/imgproxy.git
+    dest: /opt/imgproxy/imgproxy-source
+    version: "{{ imgproxy_git_tag }}"
+  become: True
+  become_user: imgproxy
+
+- name: 'CGO_LDFLAGS_ALLOW="-s|-w" go build -o /opt/imgproxy/imgproxy'
+  shell: |
+    CGO_LDFLAGS_ALLOW="-s|-w" /usr/local/bin/go/bin/go build -o /opt/imgproxy/imgproxy
+  args:
+    executable: /bin/bash
+    chdir: /opt/imgproxy/imgproxy-source
+  become: True
+
+  become_user: imgproxy
+
+
+- name: template systemd imgproxy.service
+  template:
+    src: templates/etc/systemd/system/imgproxy.service.j2
+    dest: /etc/systemd/system/imgproxy.service
+    owner: root
+    group: root
+    mode: 0640
+  notify:
+    - reload systemd daemon
+    - restart imgproxy

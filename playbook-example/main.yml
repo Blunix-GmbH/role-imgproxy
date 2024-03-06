@@ -1,0 +1,21 @@
+- name: setup imgproxy
+  hosts: my-imgproxy-server
+  roles:
+    - role: blunix_role-imgproxy_11.0.0
+  vars:
+
+    imgproxy_vips_version: "8.15.1"
+    imgproxy_git_tag: "master"
+
+
+  post_tasks:
+
+    - name: template /opt/imgproxy/imgproxy.conf
+      template:
+        src: templates/opt/imgproxy/imgproxy.conf.j2
+        dest: /opt/imgproxy/imgproxy.conf
+        owner: imgproxy
+        group: imgproxy
+        mode: 0640
+      notify:
+        - restart imgproxy
